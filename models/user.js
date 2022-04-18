@@ -1,14 +1,32 @@
 "use strict";
 
+const db = require("../db");
+const bcrypt = require("bcrypt");
+
 /** User of the site. */
 
 class User {
+
+  constructor({username, password, first_name, last_name, phone}){
+    this.username = username;
+    this.password = bcrypt.hash(password, 12);
+    this.last_name = last_name;
+    this.first_name = first_name;
+    this.phone = phone;
+  }
 
   /** Register new user. Returns
    *    {username, password, first_name, last_name, phone}
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
+    const result = await db.query(
+      `INSERT INTO users (username, password, first_name, last_name, phone)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING username, password, first_name, last_name, phone`,
+    [this.username, this.password, this.first_name, this.last_name, this.phone],
+);
+      
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
