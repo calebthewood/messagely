@@ -1,7 +1,6 @@
 "use strict";
 
 const db = require("../db");
-const bcrypt = require("bcrypt");
 const { NotFoundError } = require("../expressError");
 
 
@@ -15,10 +14,10 @@ class User {
 
   static async register({ username, password, first_name, last_name, phone }) {
     const result = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone, join_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
+       VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
        RETURNING username, password, first_name, last_name, phone`,
-      [username, bcrypt.hash(password, 12), first_name, last_name, phone, current_timestamp],
+      [username, password, first_name, last_name, phone],
     );
     return result.rows[0];
   }
@@ -33,12 +32,7 @@ class User {
       [username]);
     const user = result.rows[0];
 
-    if (user) {
-      if (await bcrypt.compare(password, user.password) === true) {
-        return true;
-      }
-    }
-    return false;
+      return user.password === password
   }
 
   /** Update last_login_at for user */
@@ -47,12 +41,20 @@ class User {
 
     const result = await db.query(
       `UPDATE users
-       SET last_login_at = current_timestamp
-         WHERE id = $1;`,
+        SET last_login_at = current_timestamp
+        WHERE username = $1
+        RETURNING username, last_login_at`,
       [username]);
+
     const user = result.rows[0];
 
+    // const test = await db.query(`
+    // SELECT last_login_at
+    // FROM users
+    // WHERE`)
+
     if (!user) throw new NotFoundError(`No such user: ${username}`);
+
   }
 
   /** All: basic info on all users:
@@ -87,6 +89,7 @@ class User {
     `, [username]);
 
     const user = results.rows[0];
+
     if (!user) throw new NotFoundError(`No such user: ${username}`);
 
     return user;
@@ -145,6 +148,7 @@ class User {
    */
 
   static async messagesTo(username) {
+
     const result = await db.query(
       `SELECT m.id,
               m.from_username,
@@ -158,7 +162,7 @@ class User {
          FROM messages AS m
                 JOIN users AS f ON m.from_username = f.username
                 JOIN users AS t ON m.to_username = t.username
-         WHERE m.to_username = $1`
+         WHERE m.to_username = $1`,
       [username]);
 
     let messages = result.rows.map(row => {
